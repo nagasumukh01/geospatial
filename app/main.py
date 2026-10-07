@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import inspect, text
 
 from app.core.config import settings
 from app.core.logging import setup_logging, logger
@@ -16,6 +17,19 @@ async def lifespan(app: FastAPI):
     setup_logging()
     logger.info("Initializing database tables...")
     Base.metadata.create_all(bind=engine)
+
+    # Automatic SQLite schema migration for missing columns
+    try:
+        with engine.connect() as conn:
+            inspector = inspect(engine)
+            columns = [c['name'] for c in inspector.get_columns('feature_measurements')]
+            if 'geometry_geojson' not in columns:
+                logger.info("Migrating database: Adding 'geometry_geojson' column to feature_measurements table...")
+                conn.execute(text("ALTER TABLE feature_measurements ADD COLUMN geometry_geojson JSON"))
+                conn.commit()
+    except Exception as e:
+        logger.warning(f"Schema check error: {e}")
+
     logger.info("Application startup complete.")
     yield
     # Shutdown
@@ -40,13 +54,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Custom exception handlers for uniform error format
+# Custom exception handler for unhandled non-HTTP exceptions
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=getattr(exc, "headers", None)
+        )
     logger.error(f"Unhandled exception on {request.method} {request.url.path}: {exc}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "An internal server error occurred. Please try again later."}
+        content={"detail": f"An internal server error occurred: {str(exc)}"}
     )
 
 # Mount static files and sample datasets

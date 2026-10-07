@@ -1,9 +1,11 @@
 import os
+import math
 import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any
+import pandas as pd
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 from shapely.geometry import mapping
@@ -18,6 +20,36 @@ from app.services.measurement_service import MeasurementService
 
 def utc_now():
     return datetime.now(timezone.utc)
+
+
+def _safe_serialize(v: Any) -> Any:
+    """Convert a value to a JSON-serializable type, replacing unserializable types with None."""
+    if v is None:
+        return None
+    # Handle pandas NA, NaT, nan
+    try:
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
+    # float NaN / Inf
+    if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+        return None
+    # numpy scalar
+    if hasattr(v, "item"):
+        return v.item()
+    # datetime / Path
+    if isinstance(v, (datetime, Path)):
+        return str(v)
+    # Primitive types
+    if isinstance(v, (int, float, str, bool)):
+        return v
+    # Fallback to string
+    try:
+        return str(v)
+    except Exception:
+        return None
+
 
 class FileService:
     @classmethod
@@ -85,22 +117,22 @@ class FileService:
                 geom = row.geometry
                 geom_type = geom.geom_type if geom is not None else "Unknown"
 
-                # Extract feature properties
+                # Safely extract + serialize feature properties
                 props = {}
                 for k, v in row.items():
                     if k != "geometry":
-                        if isinstance(v, (datetime, Path)):
-                            props[k] = str(v)
-                        elif hasattr(v, "item"):
-                            props[k] = v.item()
-                        else:
-                            try:
-                                props[k] = v
-                            except Exception:
-                                props[k] = str(v)
+                        props[k] = _safe_serialize(v)
 
-                # Geometry GeoJSON mapping
-                geom_geojson = mapping(geom) if geom is not None and not geom.is_empty else None
+                # GeoJSON geometry mapping (strip altitude for cleaner 2D GeoJSON)
+                try:
+                    if geom is not None and not geom.is_empty:
+                        raw_geojson = mapping(geom)
+                        geom_geojson = _strip_altitude(raw_geojson)
+                    else:
+                        geom_geojson = None
+                except Exception as e:
+                    logger.warning(f"Could not serialize geometry for feature {idx}: {e}")
+                    geom_geojson = None
 
                 # Measure feature
                 m_type, val, unit, m_status, err_msg = MeasurementService.measure_geometry(geom, gdf.crs)
@@ -174,7 +206,12 @@ class FileService:
     @staticmethod
     def get_file_measurements(file_id: str, db: Session) -> Dict[str, Any]:
         file_record = FileService.get_file_record(file_id, db)
-        measurements = db.query(FeatureMeasurement).filter(FeatureMeasurement.file_id == file_id).order_by(FeatureMeasurement.feature_id).all()
+        measurements = (
+            db.query(FeatureMeasurement)
+            .filter(FeatureMeasurement.file_id == file_id)
+            .order_by(FeatureMeasurement.feature_id)
+            .all()
+        )
 
         measurement_items = []
         for m in measurements:
@@ -199,12 +236,17 @@ class FileService:
     @staticmethod
     def get_file_geojson(file_id: str, db: Session) -> Dict[str, Any]:
         file_record = FileService.get_file_record(file_id, db)
-        measurements = db.query(FeatureMeasurement).filter(FeatureMeasurement.file_id == file_id).order_by(FeatureMeasurement.feature_id).all()
+        measurements = (
+            db.query(FeatureMeasurement)
+            .filter(FeatureMeasurement.file_id == file_id)
+            .order_by(FeatureMeasurement.feature_id)
+            .all()
+        )
 
         features = []
         for m in measurements:
             if m.geometry_geojson:
-                props = m.properties.copy() if m.properties else {}
+                props = (m.properties.copy() if m.properties else {})
                 props.update({
                     "feature_id": m.feature_id,
                     "geometry_type": m.geometry_type,
@@ -229,3 +271,26 @@ class FileService:
             },
             "features": features
         }
+
+
+def _strip_altitude(geojson: dict) -> dict:
+    """
+    Recursively remove the Z/altitude component from GeoJSON coordinate arrays
+    to produce clean 2D GeoJSON for Leaflet rendering.
+    """
+    def clean_coord(c):
+        return [c[0], c[1]]  # keep only lon, lat
+
+    def clean_coords(coords):
+        if not coords:
+            return coords
+        if isinstance(coords[0], (int, float)):
+            return clean_coord(coords)
+        return [clean_coords(ring) for ring in coords]
+
+    if not geojson:
+        return geojson
+    result = dict(geojson)
+    if "coordinates" in result:
+        result["coordinates"] = clean_coords(result["coordinates"])
+    return result

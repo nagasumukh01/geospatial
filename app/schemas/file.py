@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, ConfigDict
 
+
 class FeatureMeasurementItem(BaseModel):
     feature_id: int
     geometry_type: str
@@ -11,8 +12,10 @@ class FeatureMeasurementItem(BaseModel):
     status: str = "SUCCESS"
     error: Optional[str] = None
     properties: Optional[Dict[str, Any]] = None
+    geometry: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class FileUploadResponse(BaseModel):
     id: str
@@ -29,6 +32,7 @@ class FileUploadResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class FileInfoResponse(BaseModel):
     id: str
     filename: str
@@ -44,12 +48,14 @@ class FileInfoResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class FileMeasurementsResponse(BaseModel):
     file_id: str
     status: str
     measurements: List[FeatureMeasurementItem]
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class ErrorResponse(BaseModel):
     detail: str
