@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Sample Polygon Document</name>
+    <Placemark>
+      <name>Central Park Reservoir Area</name>
+      <description>Sample polygon feature in NYC</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              -73.9654,40.7829,0
+              -73.9594,40.7829,0
+              -73.9594,40.7869,0
+              -73.9654,40.7869,0
+              -73.9654,40.7829,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>

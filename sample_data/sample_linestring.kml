@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Sample LineString Document</name>
+    <Placemark>
+      <name>5th Avenue Walk</name>
+      <description>Sample linestring feature</description>
+      <LineString>
+        <coordinates>
+          -73.9654,40.7829,0
+          -73.9634,40.7849,0
+          -73.9614,40.7869,0
+        </coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>
