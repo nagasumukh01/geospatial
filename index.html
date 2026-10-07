@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoMeasure AI - Geospatial Measurement Platform</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-dark: #090d16;
+            --bg-card: rgba(18, 25, 41, 0.75);
+            --bg-card-hover: rgba(26, 36, 59, 0.85);
+            --border-glass: rgba(255, 255, 255, 0.08);
+            --border-glow: rgba(56, 189, 248, 0.3);
+            --primary: #38bdf8;
+            --primary-glow: rgba(56, 189, 248, 0.25);
+            --accent-green: #10b981;
+            --accent-purple: #8b5cf6;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --text-dim: #6b7280;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        body {
+            background-color: var(--bg-dark);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.12) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.12) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+        }
+
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem 2rem; background: rgba(9, 13, 22, 0.85); backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-glass); position: sticky; top: 0; z-index: 1000;
+        }
+
+        .brand { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; }
+        .brand-logo {
+            width: 42px; height: 42px; border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--accent-purple));
+            display: flex; align-items: center; justify-content: center; color: white; font-size: 1.25rem;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+        .brand-text h1 {
+            font-size: 1.35rem; font-weight: 700;
+            background: linear-gradient(135deg, #ffffff, var(--primary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .brand-text p { font-size: 0.75rem; color: var(--text-muted); }
+
+        .nav-actions { display: flex; align-items: center; gap: 1rem; }
+        .badge-status {
+            display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.85rem;
+            border-radius: 20px; font-size: 0.8rem; font-weight: 500;
+            background: rgba(16, 185, 129, 0.12); color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .status-dot { width: 7px; height: 7px; border-radius: 50%; background-color: var(--accent-green); }
+
+        .btn-nav {
+            padding: 0.45rem 1rem; border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass);
+            color: var(--text-main); font-size: 0.85rem; font-weight: 500; text-decoration: none;
+            display: inline-flex; align-items: center; gap: 0.5rem; transition: var(--transition);
+        }
+        .btn-nav:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--primary); color: var(--primary); }
+
+        .app-container { max-width: 1440px; margin: 0 auto; padding: 1.5rem; width: 100%; display: flex; flex-direction: column; gap: 1.5rem; flex: 1; }
+
+        .upload-card {
+            background: var(--bg-card); backdrop-filter: blur(12px);
+            border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: var(--radius-lg);
+            padding: 2.5rem; text-align: center; position: relative; transition: var(--transition);
+        }
+        .upload-card:hover { border-color: var(--primary); background: var(--bg-card-hover); }
+
+        .upload-icon {
+            width: 64px; height: 64px; border-radius: 50%;
+            background: rgba(56, 189, 248, 0.1); color: var(--primary);
+            display: flex; align-items: center; justify-content: center; font-size: 1.75rem; margin: 0 auto 1rem;
+        }
+
+        .file-input-btn {
+            display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.75rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent-purple));
+            color: white; font-weight: 600; font-size: 0.95rem; border-radius: var(--radius-md);
+            cursor: pointer; border: none; box-shadow: 0 4px 20px var(--primary-glow);
+        }
+
+        #fileInput { display: none; }
+
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+        .metric-card {
+            background: var(--bg-card); backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: 1.25rem;
+            display: flex; align-items: center; gap: 1rem;
+        }
+        .metric-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
+        .metric-icon.blue { background: rgba(56, 189, 248, 0.15); color: var(--primary); }
+        .metric-icon.green { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); }
+        .metric-icon.purple { background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); }
+        .metric-icon.amber { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); }
+        .metric-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; }
+        .metric-value { font-size: 1.35rem; font-weight: 700; }
+
+        .workspace-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.5rem; min-height: 520px; }
+        @media (max-width: 1024px) { .workspace-grid { grid-template-columns: 1fr; } }
+
+        .map-card, .table-card {
+            background: var(--bg-card); backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glass); border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column;
+        }
+        .map-header, .table-header { padding: 0.85rem 1.25rem; background: rgba(18, 25, 41, 0.9); border-bottom: 1px solid var(--border-glass); }
+        #map { flex: 1; width: 100%; min-height: 450px; background: #0f172a; }
+        .table-wrapper { flex: 1; overflow-y: auto; max-height: 460px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+        th { background: rgba(15, 23, 42, 0.8); padding: 0.75rem 1rem; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; position: sticky; top: 0; }
+        td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-glass); }
+
+        .badge-polygon { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; }
+        .badge-linestring { background: rgba(56, 189, 248, 0.15); color: var(--primary); padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; }
+
+        .config-bar {
+            background: rgba(18, 25, 41, 0.6); padding: 0.5rem 1rem; border-radius: var(--radius-sm);
+            border: 1px solid var(--border-glass); font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem;
+        }
+        .config-bar input {
+            background: #090d16; border: 1px solid var(--border-glass); color: var(--primary);
+            padding: 0.2rem 0.5rem; border-radius: 4px; font-family: 'JetBrains Mono', monospace; width: 280px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="#" class="brand">
+            <div class="brand-logo"><i class="fa-solid fa-earth-americas"></i></div>
+            <div class="brand-text">
+                <h1>GeoMeasure AI</h1>
+                <p>Geospatial File Measurement Platform</p>
+            </div>
+        </a>
+
+        <div class="nav-actions">
+            <div class="config-bar">
+                <span>API Host:</span>
+                <input type="text" id="apiBaseInput" value="http://localhost:8000/api">
+            </div>
+            <div class="badge-status" id="backendStatus">
+                <div class="status-dot"></div> Live Connection
+            </div>
+        </div>
+    </header>
+
+    <main class="app-container">
+
+        <section class="upload-card" id="dropZone">
+            <div class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+            <h2>Drag & Drop Geospatial File</h2>
+            <p style="color: var(--text-muted); margin: 0.5rem 0 1.5rem;">Supports <strong>.KML</strong> and <strong>.ZIP Shapefile</strong></p>
+
+            <label for="fileInput" class="file-input-btn">
+                <i class="fa-solid fa-folder-open"></i> Browse File
+            </label>
+            <input type="file" id="fileInput" accept=".kml,.zip">
+        </section>
+
+        <section class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-icon blue"><i class="fa-solid fa-layer-group"></i></div>
+                <div>
+                    <div class="metric-label">Total Features</div>
+                    <div class="metric-value" id="metricTotalFeatures">--</div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon green"><i class="fa-solid fa-vector-square"></i></div>
+                <div>
+                    <div class="metric-label">Total Polygon Area</div>
+                    <div class="metric-value" id="metricTotalArea">--</div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon purple"><i class="fa-solid fa-ruler-combined"></i></div>
+                <div>
+                    <div class="metric-label">Total Line Length</div>
+                    <div class="metric-value" id="metricTotalLength">--</div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon amber"><i class="fa-solid fa-compass-drafting"></i></div>
+                <div>
+                    <div class="metric-label">UTM Projection</div>
+                    <div class="metric-value" id="metricCrs">--</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="workspace-grid">
+            <div class="map-card">
+                <div class="map-header"><strong><i class="fa-solid fa-map-location-dot" style="color: var(--primary);"></i> Interactive Map</strong></div>
+                <div id="map"></div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-header"><strong><i class="fa-solid fa-table-list" style="color: var(--accent-green);"></i> Feature Measurements</strong></div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr><th>#</th><th>Geometry</th><th>Type</th><th>Value</th><th>Status</th></tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 2rem;">Upload a file above to inspect feature calculations.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script>
+        let map, geoJsonLayer, currentFileId;
+
+        function getApiBase() {
+            return document.getElementById("apiBaseInput").value.replace(/\/$/, "");
+        }
+
+        function initMap() {
+            map = L.map('map').setView([20, 0], 2);
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 16,
+                attribution: 'Tiles &copy; Esri'
+            }).addTo(map);
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            initMap();
+            document.getElementById("fileInput").addEventListener("change", (e) => {
+                if (e.target.files.length > 0) uploadFile(e.target.files[0]);
+            });
+        });
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            const apiBase = getApiBase();
+
+            try {
+                const res = await fetch(`${apiBase}/files/`, { method: 'POST', body: formData });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || "Upload failed");
+
+                currentFileId = data.id;
+                document.getElementById("metricTotalFeatures").innerText = data.feature_count || 0;
+                document.getElementById("metricCrs").innerText = data.crs || "EPSG:4326";
+
+                await fetchMeasurements(currentFileId);
+                await fetchGeoJson(currentFileId);
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        }
+
+        async function fetchMeasurements(fileId) {
+            const res = await fetch(`${getApiBase()}/files/${fileId}/measurements/`);
+            const data = await res.json();
+            renderTable(data.measurements);
+        }
+
+        async function fetchGeoJson(fileId) {
+            const res = await fetch(`${getApiBase()}/files/${fileId}/geojson/`);
+            const data = await res.json();
+            if (geoJsonLayer) map.removeLayer(geoJsonLayer);
+            geoJsonLayer = L.geoJSON(data, {
+                style: (feature) => {
+                    const type = feature.geometry ? feature.geometry.type : '';
+                    if (type.includes('Polygon')) return { color: '#10b981', weight: 2, fillColor: '#10b981', fillOpacity: 0.35 };
+                    if (type.includes('Line')) return { color: '#38bdf8', weight: 4 };
+                    return { color: '#f59e0b' };
+                }
+            }).addTo(map);
+            if (geoJsonLayer.getBounds().isValid()) map.fitBounds(geoJsonLayer.getBounds(), { padding: [30, 30] });
+        }
+
+        function renderTable(measurements) {
+            let totalArea = 0, totalLength = 0;
+            const tbody = document.getElementById("tableBody");
+            tbody.innerHTML = measurements.map(m => {
+                if (m.status === 'SUCCESS' && m.value) {
+                    if (m.measurement_type === 'area') totalArea += m.value;
+                    if (m.measurement_type === 'length') totalLength += m.value;
+                }
+                const badge = m.geometry_type.includes('Polygon') ? 'badge-polygon' : 'badge-linestring';
+                const val = m.value ? m.value.toLocaleString() : '--';
+                const unit = m.unit === 'square_meters' ? 'm²' : 'm';
+                return `<tr><td>${m.feature_id}</td><td><span class="${badge}">${m.geometry_type}</span></td><td>${m.measurement_type}</td><td><strong>${val}</strong> ${unit}</td><td style="color:#10b981">${m.status}</td></tr>`;
+            }).join('');
+
+            document.getElementById("metricTotalArea").innerText = totalArea > 0 ? `${totalArea.toLocaleString()} m²` : '--';
+            document.getElementById("metricTotalLength").innerText = totalLength > 0 ? `${totalLength.toLocaleString()} m` : '--';
+        }
+    </script>
+</body>
+</html>
