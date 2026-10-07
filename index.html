@@ -248,7 +248,11 @@
         let map, geoJsonLayer, currentFileId;
 
         function getApiBase() {
-            return document.getElementById("apiBaseInput").value.replace(/\/$/, "");
+            let val = document.getElementById("apiBaseInput").value.trim().replace(/\/$/, "");
+            if (val && !val.endsWith("/api")) {
+                val += "/api";
+            }
+            return val;
         }
 
         function initMap() {
@@ -260,6 +264,12 @@
         }
 
         document.addEventListener("DOMContentLoaded", () => {
+            if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+                const input = document.getElementById("apiBaseInput");
+                if (input && input.value.includes("localhost")) {
+                    input.value = "https://geospatial-measurement-api.onrender.com/api";
+                }
+            }
             initMap();
             document.getElementById("fileInput").addEventListener("change", (e) => {
                 if (e.target.files.length > 0) uploadFile(e.target.files[0]);
