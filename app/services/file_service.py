@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
+from shapely.geometry import mapping
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -84,20 +85,22 @@ class FileService:
                 geom = row.geometry
                 geom_type = geom.geom_type if geom is not None else "Unknown"
 
-                # Extract feature properties (exclude geometry column)
+                # Extract feature properties
                 props = {}
                 for k, v in row.items():
                     if k != "geometry":
-                        # Convert non-serializable types to str
                         if isinstance(v, (datetime, Path)):
                             props[k] = str(v)
-                        elif hasattr(v, "item"):  # numpy scalar
+                        elif hasattr(v, "item"):
                             props[k] = v.item()
                         else:
                             try:
                                 props[k] = v
                             except Exception:
                                 props[k] = str(v)
+
+                # Geometry GeoJSON mapping
+                geom_geojson = mapping(geom) if geom is not None and not geom.is_empty else None
 
                 # Measure feature
                 m_type, val, unit, m_status, err_msg = MeasurementService.measure_geometry(geom, gdf.crs)
@@ -116,7 +119,8 @@ class FileService:
                     unit=unit,
                     status=m_status,
                     error_message=err_msg,
-                    properties=props
+                    properties=props,
+                    geometry_geojson=geom_geojson
                 )
                 db.add(measurement_rec)
 
@@ -143,7 +147,6 @@ class FileService:
             return file_record
 
         except HTTPException as he:
-            # Domain / Validation Exception
             completion_time = utc_now()
             file_record.status = "FAILED"
             file_record.error_message = he.detail
@@ -152,7 +155,6 @@ class FileService:
             db.commit()
             raise he
         except Exception as e:
-            # Internal server / unexpected error
             logger.error(f"Failed processing file {file_id}: {e}", exc_info=True)
             completion_time = utc_now()
             file_record.status = "FAILED"
@@ -184,11 +186,46 @@ class FileService:
                 "unit": m.unit,
                 "status": m.status,
                 "error": m.error_message,
-                "properties": m.properties
+                "properties": m.properties,
+                "geometry": m.geometry_geojson
             })
 
         return {
             "file_id": file_record.id,
             "status": file_record.status,
             "measurements": measurement_items
+        }
+
+    @staticmethod
+    def get_file_geojson(file_id: str, db: Session) -> Dict[str, Any]:
+        file_record = FileService.get_file_record(file_id, db)
+        measurements = db.query(FeatureMeasurement).filter(FeatureMeasurement.file_id == file_id).order_by(FeatureMeasurement.feature_id).all()
+
+        features = []
+        for m in measurements:
+            if m.geometry_geojson:
+                props = m.properties.copy() if m.properties else {}
+                props.update({
+                    "feature_id": m.feature_id,
+                    "geometry_type": m.geometry_type,
+                    "measurement_type": m.measurement_type,
+                    "value": m.value,
+                    "unit": m.unit,
+                    "status": m.status
+                })
+                features.append({
+                    "type": "Feature",
+                    "geometry": m.geometry_geojson,
+                    "properties": props
+                })
+
+        return {
+            "type": "FeatureCollection",
+            "properties": {
+                "file_id": file_record.id,
+                "filename": file_record.filename,
+                "crs": file_record.crs,
+                "status": file_record.status
+            },
+            "features": features
         }

@@ -38,5 +38,6 @@ class FeatureMeasurement(Base):
     status = Column(String(50), nullable=False, default="SUCCESS")  # "SUCCESS", "FAILED", "UNSUPPORTED"
     error_message = Column(Text, nullable=True)
     properties = Column(JSON, nullable=True)
+    geometry_geojson = Column(JSON, nullable=True)  # GeoJSON Dict mapping for interactive map
 
     file_record = relationship("FileRecord", back_populates="measurements")

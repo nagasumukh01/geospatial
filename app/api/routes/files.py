@@ -57,3 +57,17 @@ def get_file_measurements(
     db: Session = Depends(get_db)
 ):
     return FileService.get_file_measurements(id, db)
+
+@router.get(
+    "/{id}/geojson/",
+    summary="Get GeoJSON feature collection for interactive map",
+    description="Returns full GeoJSON FeatureCollection with geometries, feature properties, and measurement attributes for visualization.",
+    responses={
+        404: {"model": ErrorResponse, "description": "File record not found."}
+    }
+)
+def get_file_geojson(
+    id: str,
+    db: Session = Depends(get_db)
+):
+    return FileService.get_file_geojson(id, db)

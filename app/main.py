@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.logging import setup_logging, logger
@@ -47,11 +49,21 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         content={"detail": "An internal server error occurred. Please try again later."}
     )
 
+# Mount static files and sample datasets
+static_dir = Path(__file__).parent / "static"
+sample_data_dir = Path(__file__).parent.parent / "sample_data"
+
+if sample_data_dir.exists():
+    app.mount("/sample_data", StaticFiles(directory=sample_data_dir), name="sample_data")
+
 # Include API routes
 app.include_router(files_router, prefix=settings.API_V1_STR)
 
-@app.get("/", tags=["Health Check"])
-def root():
+@app.get("/", tags=["Web Interface"])
+def serve_web_interface():
+    index_path = static_dir / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
     return {
         "title": settings.PROJECT_NAME,
         "status": "online",
